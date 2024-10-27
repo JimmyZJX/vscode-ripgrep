@@ -57,5 +57,5 @@ You can specify optional arguments to the `ripgrep.find` to control some default
 behaviors on the init directory and init query text:
 
 ```typescript
-{ dirMode?: "doc" | "workspace"; withSelection?: boolean; }
+{ dirMode?: "doc" | "workspace", withSelection?: boolean }
 ```
