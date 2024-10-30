@@ -11,6 +11,7 @@ import {
   SymbolInformation,
   SymbolKind,
   TextDocument,
+  TextEditor,
   Uri,
   window,
   workspace,
@@ -44,30 +45,30 @@ interface FindOpts {
   withSelection?: boolean;
 }
 
-async function find(opts: FindOpts) {
+async function withInit(fInit: () => Promise<void>) {
+  try {
+    await fInit();
+    await grepPanel.onEdit();
+  } catch (e) {
+    grepPanel.quit(false);
+    throw e;
+  }
+}
+
+async function redoLast() {
   const reqSrcEditor = window.activeTextEditor;
   if (reqSrcEditor === undefined) return;
 
-  const reqDoc = reqSrcEditor.document;
-  const reqViewColumn = reqSrcEditor.viewColumn;
-  const sel = reqSrcEditor.selection;
-  let initQuery = reqDoc.getText(new Range(sel.start, sel.end));
-  if (initQuery === "" && opts.withSelection) {
-    const range = reqDoc.getWordRangeAtPosition(sel.start);
-    if (range !== undefined) {
-      initQuery = reqDoc.getText(range);
-    }
-  }
-  if (grepPanel.isRegexOn()) {
-    initQuery = initQuery.replaceAll(/[\/\\^$+?.()\|\*[\]{}]/g, "\\$&");
-  }
+  const rgPanelEditor = await panelEditor(grepPanel.getLastQuery());
+  withInit(async () => await grepPanel.init(rgPanelEditor, reqSrcEditor, "last"));
+}
 
+async function panelEditor(initQuery: string) {
   const file = Uri.from({
     scheme: DUMMY_FS_SCHEME,
     path: `/${RG_BUFFER_NAME}          ${rgBufferCounter++}`,
     query: initQuery,
   });
-  workspace.fs.writeFile(file, new Uint8Array());
   const doc = await workspace.openTextDocument(file);
   languages.setTextDocumentLanguage(doc, RIPGREP_LANGID);
 
@@ -108,14 +109,32 @@ async function find(opts: FindOpts) {
     // try to turn vim into insert mode
     await commands.executeCommand("vim.remap", { after: ["A"] });
   } catch {}
+  return rgPanelEditor;
+}
 
-  try {
-    await grepPanel.init(rgPanelEditor, reqViewColumn, reqDoc, opts.dirMode);
-    await grepPanel.onEdit();
-  } catch (e) {
-    grepPanel.quit(false);
-    throw e;
+function getQueryFromDoc(reqSrcEditor: TextEditor, opts: FindOpts) {
+  const reqDoc = reqSrcEditor.document;
+  const sel = reqSrcEditor.selection;
+  let initQuery = reqDoc.getText(new Range(sel.start, sel.end));
+  if (initQuery === "" && opts.withSelection) {
+    const range = reqDoc.getWordRangeAtPosition(sel.start);
+    if (range !== undefined) {
+      initQuery = reqDoc.getText(range);
+    }
   }
+  if (grepPanel.isRegexOn()) {
+    initQuery = initQuery.replaceAll(/[\/\\^$+?.()\|\*[\]{}]/g, "\\$&");
+  }
+  return initQuery;
+}
+
+async function find(opts: FindOpts) {
+  const reqSrcEditor = window.activeTextEditor;
+  if (reqSrcEditor === undefined) return;
+
+  let initQuery = getQueryFromDoc(reqSrcEditor, opts);
+  const rgPanelEditor = await panelEditor(initQuery);
+  withInit(async () => await grepPanel.init(rgPanelEditor, reqSrcEditor, opts.dirMode));
 }
 
 export async function activate(context: ExtensionContext) {
@@ -143,6 +162,7 @@ export async function activate(context: ExtensionContext) {
       args = typeof args === "object" ? args : {};
       await find(args);
     }),
+    commands.registerCommand("ripgrep.resume", async () => await redoLast()),
     commands.registerCommand(
       "ripgrep.findInCurrentDir",
       async () => await find({ dirMode: "doc" }),

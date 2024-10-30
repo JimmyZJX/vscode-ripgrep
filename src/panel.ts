@@ -13,7 +13,6 @@ import {
   TextEditorSelectionChangeEvent,
   ThemeColor,
   Uri,
-  ViewColumn,
   window,
   workspace,
 } from "vscode";
@@ -197,14 +196,18 @@ export class Panel {
     return this.curMode.regex === "on";
   }
 
+  public getLastQuery() {
+    return this.curQuery;
+  }
+
   public async init(
     rgPanelEditor: TextEditor,
-    reqViewColumn: ViewColumn | undefined,
-    reqDoc: TextDocument,
-    dirMode: "doc" | "workspace" | undefined,
+    reqSrcEditor: TextEditor,
+    dirMode: "doc" | "workspace" | "last" | undefined,
   ) {
+    const reqDoc = reqSrcEditor.document;
     this.rgPanelEditor = rgPanelEditor;
-    this.reqViewColumn = reqViewColumn;
+    this.reqViewColumn = reqSrcEditor.viewColumn;
     this.curQuery = "";
     let workspaceRoot = undefined;
     if (workspace.workspaceFolders !== undefined) {
@@ -214,22 +217,27 @@ export class Panel {
     }
     let docDir = reqDoc.uri.scheme === "file" ? path.dirname(reqDoc.uri.path) : undefined;
     this.reqDoc = reqDoc;
-    const cwd =
-      dirMode === "doc"
-        ? docDir
-        : dirMode === "workspace"
-          ? workspaceRoot
-          : (docDir ?? workspaceRoot);
-    if (cwd === undefined) {
-      const msg = "Unable to infer cwd from current file or workspace dir";
-      window.showErrorMessage(msg);
-      throw msg;
+
+    if (dirMode === "last") {
+      // don't change [curMode]
+    } else {
+      const cwd =
+        dirMode === "doc"
+          ? docDir
+          : dirMode === "workspace"
+            ? workspaceRoot
+            : (docDir ?? workspaceRoot);
+      if (cwd === undefined) {
+        const msg = "Unable to infer cwd from current file or workspace dir";
+        window.showErrorMessage(msg);
+        throw msg;
+      }
+      const docOrWorkspaceDir = dirMode ?? (docDir !== undefined ? "doc" : "workspace");
+      this.curMode.cwd = cwd;
+      this.curMode.docDir = docDir;
+      this.curMode.workspaceRoot = workspaceRoot;
+      this.curMode.docOrWorkspaceDir = docOrWorkspaceDir;
     }
-    const docOrWorkspaceDir = dirMode ?? (docDir !== undefined ? "doc" : "workspace");
-    this.curMode.cwd = cwd;
-    this.curMode.docDir = docDir;
-    this.curMode.workspaceRoot = workspaceRoot;
-    this.curMode.docOrWorkspaceDir = docOrWorkspaceDir;
 
     const doc = this.rgPanelEditor.document;
     await rgPanelEditor.edit((eb) => {
