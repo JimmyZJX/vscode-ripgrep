@@ -278,6 +278,17 @@ export class Panel {
     }
   }
 
+  private static async closeCurrentEditor() {
+    await commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
+    if (
+      workspace
+        .getConfiguration("workbench.editor")
+        .get<boolean>("closeEmptyGroups", true) === false
+    ) {
+      await commands.executeCommand("workbench.action.closeGroup");
+    }
+  }
+
   public async quit(backToStart: boolean) {
     this.proc?.kill();
     const panelEditor = this.rgPanelEditor;
@@ -290,7 +301,7 @@ export class Panel {
         activeEditor !== undefined &&
         activeEditor.document.uri.toString() === doc.uri.toString()
       ) {
-        await commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
+        await Panel.closeCurrentEditor();
       } else {
         // try to switch to the panel editor doc on the same view column
         await window.showTextDocument(doc, {
@@ -302,7 +313,7 @@ export class Panel {
           activeEditor !== undefined &&
           activeEditor.document.uri.toString() === doc.uri.toString()
         ) {
-          await commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
+          await Panel.closeCurrentEditor();
         }
       }
 
