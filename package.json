@@ -3,7 +3,7 @@
   "publisher": "JimmyZJX",
   "displayName": "Ripgrep",
   "description": "Ripgrep with full keyboard navigable support",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "homepage": "https://github.com/JimmyZJX/vscode-ripgrep",
   "repository": {
     "type": "git",

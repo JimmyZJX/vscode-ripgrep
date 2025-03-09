@@ -61,7 +61,7 @@ interface Mode extends ToggleableModes {
   docOrWorkspaceDir: "doc" | "workspace" | undefined;
 }
 
-const MAX_LINES_TO_SHOW = 200;
+const MAX_LINES_TO_SHOW = 10_000;
 
 const queryDecoration = window.createTextEditorDecorationType({
   isWholeLine: true,
